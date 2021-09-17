@@ -2,6 +2,8 @@ package sc2
 
 import (
 	"bytes"
+	"github.com/mariomac/msxtools/img2sx/pkg/img"
+	"image"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,13 +48,17 @@ func TestEquality(t *testing.T) {
 }
 
 func TestWriteImage(t *testing.T) {
-	sc := Image{
-		Table1: []Tile{t1, t2, t2},
-		Table2: []Tile{t2, t1, t2},
-		Table3: []Tile{t2, t2, t1},
-		Names1: []uint8{1, 2, 3},
-		Names2: []uint8{4, 5, 6},
-		Names3: []uint8{7, 8, 9},
+	sc := TileSet{
+		Table: [3][]Tile {
+			{t1, t2, t2},
+			{t2, t1, t2},
+			{t2, t2, t1},
+		},
+		Names: [3][]uint8 {
+			{1, 2, 3},
+			{4, 5, 6},
+			{7, 8, 9},
+		},
 	}
 	buf := bytes.Buffer{}
 	require.NoError(t, sc.Write(&buf))
@@ -120,4 +126,36 @@ func TestWriteImage(t *testing.T) {
 
 	// and there isn't anything else left in the output file
 	assert.Empty(t, out)
+}
+
+func TestSamplePattern(t *testing.T) {
+	img := img.Bitmap{Img: image.NewNRGBA(image.Rect(0, 0, 8, 1))}
+	img.Img.Set(0, 0, Palette[4])
+	img.Img.Set(1, 0, Palette[4])
+	img.Img.Set(2, 0, Palette[7])
+	img.Img.Set(3, 0, Palette[9])
+	img.Img.Set(4, 0, Palette[9])
+	img.Img.Set(5, 0, Palette[9])
+	img.Img.Set(6, 0, Palette[9])
+	img.Img.Set(7, 0, Palette[4])
+
+	p := SamplePattern(img, 0, 0)
+	assert.EqualValuesf(t, 0b00011110, p.Bitmap, "%08b", p.Bitmap)
+	assert.EqualValuesf(t, 0b1001_0100, p.Color, "%08b", p.Color)
+}
+
+func TestSamplePattern_OneColor(t *testing.T) {
+	img := img.Bitmap{Img: image.NewNRGBA(image.Rect(0, 0, 8, 1))}
+	img.Img.Set(0, 0, Palette[4])
+	img.Img.Set(1, 0, Palette[4])
+	img.Img.Set(2, 0, Palette[4])
+	img.Img.Set(3, 0, Palette[4])
+	img.Img.Set(4, 0, Palette[4])
+	img.Img.Set(5, 0, Palette[4])
+	img.Img.Set(6, 0, Palette[4])
+	img.Img.Set(7, 0, Palette[4])
+
+	p := SamplePattern(img, 0, 0)
+	assert.EqualValuesf(t, 0b11111111, p.Bitmap, "%08b", p.Bitmap)
+	assert.EqualValuesf(t, 0b0100_1111, p.Color, "%08b", p.Color)
 }

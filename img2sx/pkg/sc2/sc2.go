@@ -1,30 +1,48 @@
 package sc2
 
 import (
+	"image"
 	"image/color"
+
+	"github.com/mariomac/msxtools/img2sx/pkg/img"
 )
 
 var Palette = color.Palette{
-	int2nrgba(0x000000),
-	int2nrgba(0x010101),
-	int2nrgba(0x3eb849),
-	int2nrgba(0x74d07d),
-	int2nrgba(0x5955e0),
-	int2nrgba(0x8076f1),
-	int2nrgba(0xb95e51),
-	int2nrgba(0x65dbef),
-	int2nrgba(0xdb6559),
-	int2nrgba(0xff897d),
-	int2nrgba(0xccc35e),
-	int2nrgba(0xded087),
-	int2nrgba(0x3aa241),
-	int2nrgba(0xb766b5),
-	int2nrgba(0xcccccc),
-	int2nrgba(0xffffff),
+	img.RGB(0x000000),
+	img.RGB(0x010101),
+	img.RGB(0x3eb849),
+	img.RGB(0x74d07d),
+	img.RGB(0x5955e0),
+	img.RGB(0x8076f1),
+	img.RGB(0xb95e51),
+	img.RGB(0x65dbef),
+	img.RGB(0xdb6559),
+	img.RGB(0xff897d),
+	img.RGB(0xccc35e),
+	img.RGB(0xded087),
+	img.RGB(0x3aa241),
+	img.RGB(0xb766b5),
+	img.RGB(0xcccccc),
+	img.RGB(0xffffff),
 }
 
-func int2nrgba(i uint32) color.NRGBA {
-	return color.NRGBA{R: uint8(i >> 16), G: uint8(i >> 8), B: uint8(i), A: 0xFF}
+var inversePalette = map[img.RGB]uint8{
+	0x000000: 0,
+	0x010101: 1,
+	0x3eb849: 2,
+	0x74d07d: 3,
+	0x5955e0: 4,
+	0x8076f1: 5,
+	0xb95e51: 6,
+	0x65dbef: 7,
+	0xdb6559: 8,
+	0xff897d: 9,
+	0xccc35e: 10,
+	0xded087: 11,
+	0x3aa241: 12,
+	0xb766b5: 13,
+	0xcccccc: 14,
+	0xffffff: 15,
 }
 
 // Screen 2 VRAM addresses
@@ -68,15 +86,100 @@ type Pattern struct {
 	Color uint8
 }
 
+// todo: probably the results will be better if we first sample patterns and then reduce to the sc2 palette
+func SamplePattern(bitmap img.Bitmap, x, y int) Pattern {
+	// count the 2 most frequent colors
+	var frequency [16]int
+	mf, mf2 := -1, -1
+	for i := 0 ; i < 8 ; i++ {
+		cn := inversePalette[bitmap.RGBAt(x+i, y)]
+		frequency[cn]++
+		if mf < 0 || frequency[cn] > frequency[mf] {
+			mf2 = mf
+			mf = int(cn)
+		} else if int(cn) != mf && (mf2 < 0 || frequency[cn] > frequency[mf2]) {
+			mf2 = int(cn)
+		}
+	}
+	// foreground is the most frequent color, background the second most frequent color
+	// build the bitmap as a function of the closer colors to background or foreground
+	bmp := uint8(0)
+	for i:=0 ; i < 8 ; i++ {
+		bmp <<= 1
+		b := uint8(1)
+		px := bitmap.RGBAt(x+i, y)
+
+		if mf2 >= 0 {
+			dmf := px.DistanceTo(Palette[mf].(img.RGB))
+			dmf2 := px.DistanceTo(Palette[mf2].(img.RGB))
+			if dmf == dmf2 && i%2 == 0 || dmf2 < dmf {
+				b = 0
+			}
+		}
+		bmp |= b
+	}
+	return Pattern{
+		Bitmap: bmp,
+		Color:  uint8(mf)<<4 | uint8(mf2&0b1111),
+	}
+}
+
 // Tile is formed by 8 patterns, representing an 8x8 pixels tile
 type Tile [tilePatterns]Pattern
 
-// Image keeps the data of a whole Screen 2 image
-type Image struct {
-	Table1 []Tile
-	Table2 []Tile
-	Table3 []Tile
-	Names1 []uint8
-	Names2 []uint8
-	Names3 []uint8
+// TileSet keeps the data of a whole Screen 2 image
+type TileSet struct {
+	Table [3][]Tile
+	Names [3][]uint8
 }
+
+func FromImage(img img.Bitmap) TileSet {
+	ts := TileSet{}
+	// TODO: avoid repeating tiles
+	for table := 0 ; table < 3 ; table++ {
+		name := 0
+		for y := table*64; y < table*64+64; y += 8 {
+			for x := 0; x < 255; x += 8 {
+				t := Tile{}
+				for dy := 0; dy < 8; dy++ {
+					t[dy] = SamplePattern(img, x, y+dy)
+				}
+				ts.Names[table] = append(ts.Names[table], uint8(name))
+				ts.Table[table] = append(ts.Table[table], t)
+				name++
+			}
+		}
+	}
+	return ts
+}
+
+func (s *TileSet) ColorModel() color.Model {
+	return Palette
+}
+
+func (s *TileSet) Bounds() image.Rectangle {
+	// todo: global constant
+	return image.Rect(0, 0, 256,192)
+}
+
+func (s *TileSet) At(x, y int) color.Color {
+	// select absolute tile number from x, y
+	screenTile := (y/8)*32+x/8
+	// select position in tile names table
+	namesTable := 0
+	// use logical operations to avoid loop
+	for screenTile >= 256 {
+		namesTable++
+		screenTile -= 256
+	}
+	pattern := s.Table[namesTable][screenTile][y % 8]
+	pixelMask := pattern.Bitmap & (1 << (7-x%8))
+	if pixelMask == 0 {
+		// return background color
+		return Palette[pattern.Color & 0b1111]
+	} else {
+		// return foreground color
+		return Palette[pattern.Color >> 4]
+	}
+}
+

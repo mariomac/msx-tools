@@ -2,10 +2,13 @@ package img
 
 import (
 	"fmt"
+	"image/color"
 )
 
 // RGB color without Alpha (24 lower bits)
 type RGB uint32
+
+var _ color.Color = RGB(0)
 
 // Red component of a color
 func (c RGB) Red() uint8 {
@@ -41,7 +44,8 @@ func (c RGB) String() string {
 }
 
 // RGBA implements color.Color interface
+// TODO: inline the same formula as color.NRGBA item
 func (c RGB) RGBA() (r, g, b, a uint32) {
-	return uint32(c.Red())*0xFF, uint32(c.Green())*0xFF, uint32(c.Blue())*0xFF, 0xffff
+	return color.NRGBA{R: c.Red(), G: c.Green(), B: c.Blue(), A: 0xFF}.RGBA()
 }
 
