@@ -1,31 +1,37 @@
 package sc2
 
-type RGB uint32
+import (
+	"image/color"
+)
 
-var colorAttrs = []RGB{
-	0x000000,
-	0x010101,
-	0x3eb849,
-	0x74d07d,
-	0x5955e0,
-	0x8076f1,
-	0xb95e51,
-	0x65dbef,
-	0xdb6559,
-	0xff897d,
-	0xccc35e,
-	0xded087,
-	0x3aa241,
-	0xb766b5,
-	0xcccccc,
-	0xffffff,
+var Palette = color.Palette{
+	int2nrgba(0x000000),
+	int2nrgba(0x010101),
+	int2nrgba(0x3eb849),
+	int2nrgba(0x74d07d),
+	int2nrgba(0x5955e0),
+	int2nrgba(0x8076f1),
+	int2nrgba(0xb95e51),
+	int2nrgba(0x65dbef),
+	int2nrgba(0xdb6559),
+	int2nrgba(0xff897d),
+	int2nrgba(0xccc35e),
+	int2nrgba(0xded087),
+	int2nrgba(0x3aa241),
+	int2nrgba(0xb766b5),
+	int2nrgba(0xcccccc),
+	int2nrgba(0xffffff),
+}
+
+func int2nrgba(i uint32) color.NRGBA {
+	return color.NRGBA{R: uint8(i >> 16), G: uint8(i >> 8), B: uint8(i), A: 0xFF}
 }
 
 // Screen 2 VRAM addresses
 const (
-	patternGen1 = 0x0000
-	patternGen2 = 0x0800
-	patternGen3 = 0x1000
+	patternGen1  = 0x0000
+	patternGen2  = 0x0800
+	patternGen3  = 0x1000
 	patternName1 = 0x1800
 	patternName2 = 0x1900
 	patternName3 = 0x1a00
@@ -39,7 +45,7 @@ const (
 
 // screen size
 const (
-	PixelsWidth = 256
+	PixelsWidth  = 256
 	PixelsHeight = 192
 )
 
@@ -51,7 +57,6 @@ const (
 	// number of patterns (actual bytes) for the pattern generator & color tables
 	tablePatterns = 0x800
 )
-
 
 // Pattern represent the 8-pixel line of a tile
 type Pattern struct {
