@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	raw, err := ioutil.ReadFile("test/input/balon.jpg")
+	raw, err := ioutil.ReadFile("test/input/goku.jpg")
 	panicOnErr(err)
 
 	bmp, err := img.Load(bytes.NewReader(raw), sc2.Palette)
@@ -20,8 +20,13 @@ func main() {
 
 	out, err := os.OpenFile("output.png", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
 	panicOnErr(err)
-
+	defer out.Close()
 	panicOnErr(png.Encode(out, &sc2img))
+
+	out2, err := os.OpenFile("output.sc2", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	panicOnErr(err)
+	defer out2.Close()
+	sc2img.Write(out2)
 }
 
 func panicOnErr(err error) {

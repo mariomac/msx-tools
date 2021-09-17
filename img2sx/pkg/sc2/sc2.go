@@ -92,6 +92,7 @@ func SamplePattern(bitmap img.Bitmap, x, y int) Pattern {
 	var frequency [16]int
 	mf, mf2 := -1, -1
 	for i := 0 ; i < 8 ; i++ {
+		// TODO: replace color 0 by color 1
 		cn := inversePalette[bitmap.RGBAt(x+i, y)]
 		frequency[cn]++
 		if mf < 0 || frequency[cn] > frequency[mf] {
