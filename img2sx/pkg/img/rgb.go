@@ -48,4 +48,3 @@ func (c RGB) String() string {
 func (c RGB) RGBA() (r, g, b, a uint32) {
 	return color.NRGBA{R: c.Red(), G: c.Green(), B: c.Blue(), A: 0xFF}.RGBA()
 }
-

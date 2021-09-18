@@ -2,9 +2,10 @@ package sc2
 
 import (
 	"bytes"
-	"github.com/mariomac/msxtools/img2sx/pkg/img"
 	"image"
 	"testing"
+
+	"github.com/mariomac/msxtools/img2sx/pkg/img"
 
 	"github.com/stretchr/testify/require"
 
@@ -49,12 +50,12 @@ func TestEquality(t *testing.T) {
 
 func TestWriteImage(t *testing.T) {
 	sc := TileSet{
-		Table: [3][]Tile {
+		Table: [3][]Tile{
 			{t1, t2, t2},
 			{t2, t1, t2},
 			{t2, t2, t1},
 		},
-		Names: [3][]uint8 {
+		Names: [3][]uint8{
 			{1, 2, 3},
 			{4, 5, 6},
 			{7, 8, 9},
@@ -139,7 +140,7 @@ func TestSamplePattern(t *testing.T) {
 	img.Img.Set(6, 0, Palette[9])
 	img.Img.Set(7, 0, Palette[4])
 
-	p := SamplePattern(img, 0, 0)
+	p := sample(img, 0, 0)
 	assert.EqualValuesf(t, 0b00011110, p.Bitmap, "%08b", p.Bitmap)
 	assert.EqualValuesf(t, 0b1001_0100, p.Color, "%08b", p.Color)
 }
@@ -155,7 +156,7 @@ func TestSamplePattern_OneColor(t *testing.T) {
 	img.Img.Set(6, 0, Palette[4])
 	img.Img.Set(7, 0, Palette[4])
 
-	p := SamplePattern(img, 0, 0)
+	p := sample(img, 0, 0)
 	assert.EqualValuesf(t, 0b11111111, p.Bitmap, "%08b", p.Bitmap)
 	assert.EqualValuesf(t, 0b0100_1111, p.Color, "%08b", p.Color)
 }

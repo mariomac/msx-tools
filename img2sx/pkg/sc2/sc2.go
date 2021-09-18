@@ -3,6 +3,9 @@ package sc2
 import (
 	"image"
 	"image/color"
+	"image/draw"
+
+	"github.com/nfnt/resize"
 
 	"github.com/mariomac/msxtools/img2sx/pkg/img"
 )
@@ -27,7 +30,7 @@ var Palette = color.Palette{
 }
 
 var inversePalette = map[img.RGB]uint8{
-	0x000000: 0,
+	//0x000000: 0,
 	0x010101: 1,
 	0x3eb849: 2,
 	0x74d07d: 3,
@@ -79,28 +82,16 @@ const (
 func toRGB(c color.Color) img.RGB {
 	r, g, b, a := c.RGBA()
 
-	orig := c.(color.NRGBA)
-
 	r *= 0xff
 	r /= a
-	if r != uint32(orig.R) {
-		panic(r)
-	}
 
 	g *= 0xff
 	g /= a
-	if g != uint32(orig.G) {
-		panic(g)
-	}
 
 	b *= 0xff
 	b /= a
-	if b != uint32(orig.B) {
-		panic(b)
-	}
 
-	return img.RGB(r << 16 | g << 8 | b)
-
+	return img.RGB(r<<16 | g<<8 | b)
 }
 
 // Pattern represent the 8-pixel line of a tile
@@ -113,12 +104,11 @@ type Pattern struct {
 	Color uint8
 }
 
-// todo: probably the results will be better if we first sample patterns and then reduce to the sc2 palette
-func SamplePattern(bitmap image.Image, x, y int) Pattern {
+func sample(bitmap image.Image, x, y int) Pattern {
 	// count the 2 most frequent colors
 	var frequency [16]int
 	mf, mf2 := -1, -1
-	for i := 0 ; i < 8 ; i++ {
+	for i := 0; i < 8; i++ {
 		// TODO: replace color 0 by color 1
 		cn := inversePalette[toRGB(bitmap.At(x+i, y))]
 		frequency[cn]++
@@ -132,7 +122,7 @@ func SamplePattern(bitmap image.Image, x, y int) Pattern {
 	// foreground is the most frequent color, background the second most frequent color
 	// build the bitmap as a function of the closer colors to background or foreground
 	bmp := uint8(0)
-	for i:=0 ; i < 8 ; i++ {
+	for i := 0; i < 8; i++ {
 		bmp <<= 1
 		b := uint8(1)
 		px := toRGB(bitmap.At(x+i, y))
@@ -162,17 +152,40 @@ type TileSet struct {
 	Names [3][]uint8
 }
 
-// TODO: error if image does not have correct boundaries (or maybe resize/crop)
-func FromImage(img image.Image) *TileSet {
+func Convert(img image.Image, opt ConvertOpt) *TileSet {
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	if w != PixelsWidth || h != PixelsHeight {
+		switch opt {
+		case Crop:
+			// do nothing
+		case Stretch:
+			// TODO: allow an option to set resize type
+			img = resize.Resize(PixelsWidth, PixelsHeight, img, resize.Bilinear)
+		case KeepAspect:
+			if float64(w)/float64(h) > float64(PixelsWidth)/float64(PixelsHeight) {
+				img = resize.Resize(PixelsWidth, 0, img, resize.Bilinear)
+			} else {
+				img = resize.Resize(0, PixelsHeight, img, resize.Bilinear)
+			}
+		}
+	}
+	// migrating to 16 color without alpha
+	// intentionally omitting zero color
+	sc2Bounds := image.Rect(0, 0, PixelsWidth, PixelsHeight)
+	paletted := image.NewPaletted(sc2Bounds, Palette[1:])
+	draw.Draw(paletted, sc2Bounds, img, image.Pt(0, 0), draw.Src)
+	colorNormalized := image.NewNRGBA(sc2Bounds)
+	draw.Draw(colorNormalized, sc2Bounds, paletted, image.Pt(0, 0), draw.Src)
+
 	ts := TileSet{}
 	// TODO: avoid repeating tiles
-	for table := 0 ; table < 3 ; table++ {
+	for table := 0; table < 3; table++ {
 		name := 0
-		for y := table*64; y < table*64+64; y += 8 {
+		for y := table * 64; y < table*64+64; y += 8 {
 			for x := 0; x < 255; x += 8 {
 				t := Tile{}
 				for dy := 0; dy < 8; dy++ {
-					t[dy] = SamplePattern(img, x, y+dy)
+					t[dy] = sample(colorNormalized, x, y+dy)
 				}
 				ts.Names[table] = append(ts.Names[table], uint8(name))
 				ts.Table[table] = append(ts.Table[table], t)
@@ -189,12 +202,12 @@ func (s *TileSet) ColorModel() color.Model {
 
 func (s *TileSet) Bounds() image.Rectangle {
 	// todo: global constant
-	return image.Rect(0, 0, 256,192)
+	return image.Rect(0, 0, 256, 192)
 }
 
 func (s *TileSet) At(x, y int) color.Color {
 	// select absolute tile number from x, y
-	screenTile := (y/8)*32+x/8
+	screenTile := (y/8)*32 + x/8
 	// select position in tile names table
 	namesTable := 0
 	// use logical operations to avoid loop
@@ -202,14 +215,13 @@ func (s *TileSet) At(x, y int) color.Color {
 		namesTable++
 		screenTile -= 256
 	}
-	pattern := s.Table[namesTable][screenTile][y % 8]
-	pixelMask := pattern.Bitmap & (1 << (7-x%8))
+	pattern := s.Table[namesTable][screenTile][y%8]
+	pixelMask := pattern.Bitmap & (1 << (7 - x%8))
 	if pixelMask == 0 {
 		// return background color
-		return Palette[pattern.Color & 0b1111]
+		return Palette[pattern.Color&0b1111]
 	} else {
 		// return foreground color
-		return Palette[pattern.Color >> 4]
+		return Palette[pattern.Color>>4]
 	}
 }
-

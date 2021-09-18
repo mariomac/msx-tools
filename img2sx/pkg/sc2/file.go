@@ -8,6 +8,14 @@ import (
 	"io/ioutil"
 )
 
+type ConvertOpt string
+
+const (
+	Crop       ConvertOpt = "crop"
+	Stretch    ConvertOpt = "stretch"
+	KeepAspect ConvertOpt = "keepaspect"
+)
+
 var signature = []uint8{0xfe, 0x00, 0x00, 0xff, 0x37, 0x00, 0x00}
 
 func init() {
@@ -25,7 +33,7 @@ func decode(r io.Reader) (image.Image, error) {
 		return nil, fmt.Errorf("file is too short (%v bytes, min length: %v)",
 			len(content), minFileLength)
 	}
-	if bytes.Compare(signature, content[:len(signature)]) != 0 {
+	if !bytes.Equal(signature, content[:len(signature)]) {
 		return nil, fmt.Errorf("invalid signature: %v", content[:len(signature)])
 	}
 	content = content[len(signature):]
@@ -33,7 +41,7 @@ func decode(r io.Reader) (image.Image, error) {
 	ts := TileSet{}
 	i := 0
 	for t := range ts.Table {
-		for tileNum := 0 ; tileNum < 256 ; tileNum++ {
+		for tileNum := 0; tileNum < 256; tileNum++ {
 			tl := Tile{}
 			for p := 0; p < 8; p++ {
 				tl[p].Bitmap = content[i]
@@ -67,15 +75,24 @@ func decode(r io.Reader) (image.Image, error) {
 func decodeConfig(_ io.Reader) (image.Config, error) {
 	return image.Config{
 		ColorModel: Palette,
-		Width: 256,
-		Height: 192,
+		Width:      256,
+		Height:     192,
 	}, nil
 }
 
-func Encode(out io.Writer, i image.Image) error {
+type Encoder struct {
+	Opt ConvertOpt
+}
+
+func Encode(out io.Writer, s image.Image) error {
+	e := Encoder{Opt: KeepAspect}
+	return e.Encode(out, s)
+}
+
+func (e *Encoder) Encode(out io.Writer, i image.Image) error {
 	s, ok := i.(*TileSet)
 	if !ok {
-		s = FromImage(i)
+		s = Convert(i, e.Opt)
 	}
 
 	// Write file signature

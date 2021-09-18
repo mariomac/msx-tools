@@ -11,8 +11,18 @@ It's also a Go library to handle SC2 files as `image.Image` interface implemento
 ## Usage
 
 ```
-img2sx -i <input_file.png> output_file.png
+img2sx -i <input_file> -opt <options> <output_file.png>
 ```
+
+options. Comma-separated list:
+
+* sc2 output:
+```
+crop: if source is larger than the image, it crops the destination image (default)
+stretch: if source and dest file size are diferent, crops
+aspect: if source and dest sizes are different, rescales keeping the aspect ratio
+```
+
 
 ## API
 
