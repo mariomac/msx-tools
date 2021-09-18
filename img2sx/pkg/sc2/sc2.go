@@ -76,6 +76,33 @@ const (
 	tablePatterns = 0x800
 )
 
+func toRGB(c color.Color) img.RGB {
+	r, g, b, a := c.RGBA()
+
+	orig := c.(color.NRGBA)
+
+	r *= 0xff
+	r /= a
+	if r != uint32(orig.R) {
+		panic(r)
+	}
+
+	g *= 0xff
+	g /= a
+	if g != uint32(orig.G) {
+		panic(g)
+	}
+
+	b *= 0xff
+	b /= a
+	if b != uint32(orig.B) {
+		panic(b)
+	}
+
+	return img.RGB(r << 16 | g << 8 | b)
+
+}
+
 // Pattern represent the 8-pixel line of a tile
 type Pattern struct {
 	// Bitmap where each bit represents a pixel
@@ -87,13 +114,13 @@ type Pattern struct {
 }
 
 // todo: probably the results will be better if we first sample patterns and then reduce to the sc2 palette
-func SamplePattern(bitmap img.Bitmap, x, y int) Pattern {
+func SamplePattern(bitmap image.Image, x, y int) Pattern {
 	// count the 2 most frequent colors
 	var frequency [16]int
 	mf, mf2 := -1, -1
 	for i := 0 ; i < 8 ; i++ {
 		// TODO: replace color 0 by color 1
-		cn := inversePalette[bitmap.RGBAt(x+i, y)]
+		cn := inversePalette[toRGB(bitmap.At(x+i, y))]
 		frequency[cn]++
 		if mf < 0 || frequency[cn] > frequency[mf] {
 			mf2 = mf
@@ -108,7 +135,7 @@ func SamplePattern(bitmap img.Bitmap, x, y int) Pattern {
 	for i:=0 ; i < 8 ; i++ {
 		bmp <<= 1
 		b := uint8(1)
-		px := bitmap.RGBAt(x+i, y)
+		px := toRGB(bitmap.At(x+i, y))
 
 		if mf2 >= 0 {
 			dmf := px.DistanceTo(Palette[mf].(img.RGB))
@@ -130,11 +157,13 @@ type Tile [tilePatterns]Pattern
 
 // TileSet keeps the data of a whole Screen 2 image
 type TileSet struct {
+	// todo: make private
 	Table [3][]Tile
 	Names [3][]uint8
 }
 
-func FromImage(img img.Bitmap) TileSet {
+// TODO: error if image does not have correct boundaries (or maybe resize/crop)
+func FromImage(img image.Image) *TileSet {
 	ts := TileSet{}
 	// TODO: avoid repeating tiles
 	for table := 0 ; table < 3 ; table++ {
@@ -151,7 +180,7 @@ func FromImage(img img.Bitmap) TileSet {
 			}
 		}
 	}
-	return ts
+	return &ts
 }
 
 func (s *TileSet) ColorModel() color.Model {

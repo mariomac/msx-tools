@@ -159,3 +159,5 @@ func TestSamplePattern_OneColor(t *testing.T) {
 	assert.EqualValuesf(t, 0b11111111, p.Bitmap, "%08b", p.Bitmap)
 	assert.EqualValuesf(t, 0b0100_1111, p.Color, "%08b", p.Color)
 }
+
+// TODO: test sc2 -> img -> sc2 conversion and see that input and output are equal

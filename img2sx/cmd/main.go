@@ -2,31 +2,30 @@ package main
 
 import (
 	"bytes"
-	"github.com/mariomac/msxtools/img2sx/pkg/img"
-	"github.com/mariomac/msxtools/img2sx/pkg/sc2"
+	"fmt"
+	"image"
 	"image/png"
 	"io/ioutil"
 	"os"
+
+	_ "github.com/mariomac/msxtools/img2sx/pkg/sc2"
 )
 
+//type imageConverter
+
 func main() {
-	raw, err := ioutil.ReadFile("test/input/goku.jpg")
+	raw, err := ioutil.ReadFile("test/input/burns.sc2")
 	panicOnErr(err)
 
-	bmp, err := img.Load(bytes.NewReader(raw), sc2.Palette)
+	bmp, format, err := image.Decode(bytes.NewReader(raw))
 	panicOnErr(err)
-
-	sc2img := sc2.FromImage(bmp)
+	fmt.Println("decoded format", format)
 
 	out, err := os.OpenFile("output.png", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
 	panicOnErr(err)
 	defer out.Close()
-	panicOnErr(png.Encode(out, &sc2img))
+	panicOnErr(png.Encode(out, bmp))
 
-	out2, err := os.OpenFile("output.sc2", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
-	panicOnErr(err)
-	defer out2.Close()
-	sc2img.Write(out2)
 }
 
 func panicOnErr(err error) {
