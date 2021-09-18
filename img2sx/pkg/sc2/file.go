@@ -6,6 +6,8 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+
+	"github.com/mariomac/msxtools/img2sx/pkg/internal/screen2"
 )
 
 type ConvertOpt string
@@ -38,11 +40,11 @@ func decode(r io.Reader) (image.Image, error) {
 	}
 	content = content[len(signature):]
 	// read pattern generator tables
-	ts := TileSet{}
+	ts := Image{}
 	i := 0
 	for t := range ts.Table {
 		for tileNum := 0; tileNum < 256; tileNum++ {
-			tl := Tile{}
+			tl := screen2.Tile{}
 			for p := 0; p < 8; p++ {
 				tl[p].Bitmap = content[i]
 				i++
@@ -57,7 +59,7 @@ func decode(r io.Reader) (image.Image, error) {
 	ts.Names[2] = content[512:768]
 	content = content[768:]
 	// discard sprites and palette
-	content = content[color1-spriteAttrs:]
+	content = content[screen2.AddrColorTable1-screen2.AddrSpriteAttrs:]
 
 	// read color tables
 	i = 0
@@ -74,7 +76,7 @@ func decode(r io.Reader) (image.Image, error) {
 
 func decodeConfig(_ io.Reader) (image.Config, error) {
 	return image.Config{
-		ColorModel: Palette,
+		ColorModel: screen2.Palette,
 		Width:      256,
 		Height:     192,
 	}, nil
@@ -90,9 +92,9 @@ func Encode(out io.Writer, s image.Image) error {
 }
 
 func (e *Encoder) Encode(out io.Writer, i image.Image) error {
-	s, ok := i.(*TileSet)
+	s, ok := i.(*Image)
 	if !ok {
-		s = Convert(i, e.Opt)
+		s = convert(i, e.Opt)
 	}
 
 	// Write file signature
@@ -100,7 +102,7 @@ func (e *Encoder) Encode(out io.Writer, i image.Image) error {
 		return err
 	}
 	// Write pattern generator tables
-	bget := func(p Pattern) uint8 {
+	bget := func(p screen2.Pattern) uint8 {
 		return p.Bitmap
 	}
 	for _, table := range s.Table {
@@ -115,11 +117,11 @@ func (e *Encoder) Encode(out io.Writer, i image.Image) error {
 		}
 	}
 	// Fill sprite attributes & palette with zeroes
-	if _, err := out.Write(make([]uint8, color1-spriteAttrs)); err != nil {
+	if _, err := out.Write(make([]uint8, screen2.AddrColorTable1-screen2.AddrSpriteAttrs)); err != nil {
 		return err
 	}
 	// Fill color tables
-	cget := func(p Pattern) uint8 {
+	cget := func(p screen2.Pattern) uint8 {
 		return p.Color
 	}
 	for _, table := range s.Table {
@@ -132,20 +134,20 @@ func (e *Encoder) Encode(out io.Writer, i image.Image) error {
 
 // if fillZeroes == true, it fills the array with zeros until
 // its size
-func acquireBytes(tiles []Tile, fillZeroes bool, getter func(Pattern) uint8) []uint8 {
+func acquireBytes(tiles []screen2.Tile, fillZeroes bool, getter func(screen2.Pattern) uint8) []uint8 {
 	bytes := make([]uint8, tablePatterns)
-	if len(tiles) > tableTiles {
-		tiles = tiles[:tableTiles]
+	if len(tiles) > screen2.TableTiles {
+		tiles = tiles[:screen2.TableTiles]
 	}
 	for tn, tile := range tiles {
 		for pn, pattern := range tile {
-			bytes[tn*tilePatterns+pn] = getter(pattern)
+			bytes[tn*screen2.TilePatterns+pn] = getter(pattern)
 		}
 	}
 	if fillZeroes {
 		return bytes
 	} else {
-		return bytes[:len(tiles)*tilePatterns]
+		return bytes[:len(tiles)*screen2.TilePatterns]
 	}
 }
 
@@ -153,8 +155,8 @@ func writeNames(out io.Writer, names []uint8, fillZeroes bool) error {
 	if _, err := out.Write(names); err != nil {
 		return err
 	}
-	if fillZeroes && len(names) < tableTiles {
-		if _, err := out.Write(make([]uint8, tableTiles-len(names))); err != nil {
+	if fillZeroes && len(names) < screen2.TableTiles {
+		if _, err := out.Write(make([]uint8, screen2.TableTiles-len(names))); err != nil {
 			return err
 		}
 	}
